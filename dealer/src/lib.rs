@@ -1,14 +1,19 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+#![no_std]
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+use soroban_sdk::{contractimpl, vec, Env, Vec};
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+pub struct Contract;
+
+#[contractimpl]
+impl Contract {
+    pub fn randgen() -> u32 {
+        // Returns a random number between 1 and 13.
+        // For now, it always returns 3.
+        return 3;
+    }
+    pub fn deal(env: Env) -> Vec<u32> {
+        let _card1: u32 = Self::randgen();
+        let _card2: u32 = Self::randgen();
+        vec![&env, _card1, _card2]
     }
 }
