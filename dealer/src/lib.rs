@@ -1,32 +1,47 @@
 #![no_std]
 
-use soroban_sdk::{contractimpl, vec, Env, symbol, Vec, Symbol};
-
-const CARD: Symbol = symbol!("CARD");
+use soroban_sdk::{contractimpl, Env, Bytes};
 
 pub struct Contract;
 
 #[contractimpl]
 impl Contract {
-    pub fn next(x: u32) -> u32 {
-        // Multiplying it by 2 and taking mod 13 continuously
-        // leads to a different number in {1, 2, ..., 13}.
-        // This is pretty dumb but is good enough for testing.
-        return (2 * x) % 13;
-    }
-    pub fn deal(env: Env) -> Vec<u32> {
-        // Get the current count.
-        let card: u32 = env
-            .storage()
-            .get(&CARD)
-            .unwrap_or(Ok(1)) // If no value set, assume 1.
-            .unwrap(); // Panic if the value of CARD is not u32.
+    pub fn pub_prms() -> Bytes {
+        // This returns bytes containing:
+        // - Preprocessed circuits
+        // - Public parameters
+        // - Eval domains.
 
-        // Not exactly random, but looks random enough for this purpose.
-        let _card1: u32 = Self::next(card);
-        let _card2: u32 = Self::next(_card1);
-        // Save the count.
-        env.storage().set(&CARD, &_card2);
-        vec![&env, _card1, _card2]
+        // This is a fairly crappy design, but for this Hackathon,
+        // I think it's okay to just hardcode everything.
+        let a:Bytes = "hardcoded secret bytes";
+        return a;
+    }
+
+    // Verify the proof
+    pub fn verify(env: Env) -> bool {
+        // What does this do?
+        //  The "dealer" wants to determine that you're not bluffing.
+        //  In case of Blackjack, you can't ask for more cards if your sum is already over 21.
+        //  However, the player wants to keep the cards hidden.
+        //  This `verify` function takes the user's address and
+        //  make sure that the user's making a sensible decision
+        //  without learning what their cards are.
+        //
+        // Implementation:
+        //  This function will likely use the host's verify_proof.
+        //
+
+        let invoker = env.invoker();
+
+        // TODO: I have no idea how to connect this `invoker`
+        // with the `player` contract.
+
+        let _proof:Bytes;
+        // call verify_proof(_proof) and return it.
+
+
+        // Placeholder bool
+        true
     }
 }
