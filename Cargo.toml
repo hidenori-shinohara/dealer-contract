@@ -20,7 +20,7 @@ lto = true
 [workspace.dependencies.soroban-sdk]
 version = "0.4.3"
 git = "https://github.com/jayz22/rs-soroban-sdk"
-rev = "2f65876"
+rev = "a936218"
 
-[patch."https://github.com/jayz22/rs-soroban-sdk"]
-soroban-sdk ={ path = "../rs-soroban-sdk/soroban-sdk"}
+# [patch."https://github.com/jayz22/rs-soroban-sdk"]
+# soroban-sdk ={ path = "../rs-soroban-sdk/soroban-sdk"}
