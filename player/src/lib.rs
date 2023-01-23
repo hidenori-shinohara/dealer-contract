@@ -1,128 +1,87 @@
 #![no_std]
 
-use soroban_sdk::{contractimpl, vec, Env, symbol, Vec, Symbol, log, Bytes};
+use soroban_sdk::{contracterror, contractimpl, log, symbol, vec, Bytes, Env, Symbol, Vec};
 
-const CARD1: Symbol = symbol!("CARD1");
-const CARD2: Symbol = symbol!("CARD2");
-const CHOICE: Symbol = symbol!("CHOICE");
-const HIT: Symbol = symbol!("HIT");
-const NONE: Symbol = symbol!("NONE");
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum Error {
+    InvalidDecision = 0,
+    NoCards = 1,
+    NoProof = 2,
+    NoDecision = 3,
+}
+
+const CARDS: Symbol = symbol!("CARDS");
+const PROOF: Symbol = symbol!("PROOF");
+const DECISION: Symbol = symbol!("DECISION");
 const STAND: Symbol = symbol!("STAND");
+const HIT: Symbol = symbol!("HIT");
 
-pub struct Contract;
+pub struct Player;
+
+fn generate_proof(env: &Env, decision: u32) {
+    let cards: Vec<u32>;
+    if decision == 0 {
+        // STAND, generate a dummy proof with zero cards
+        cards = vec![env, 0, 0, 0];
+    } else {
+        cards = env.storage().get_unchecked(&CARDS).unwrap();
+    }
+    let proof = env.prove(cards, vec![env, decision]);
+    env.storage().set(&PROOF, proof);
+}
 
 #[contractimpl]
-impl Contract {
+impl Player {
     // Draw cards
-    pub fn draw(env: Env) -> Vec<u32> {
-        let card1: u32 = env
-            .storage()
-            .get(&CARD1)
-            .unwrap_or(Ok(1)) // If no value set, assume 1.
-            .unwrap(); // Panic if the value of CARD is not u32.
-
-        let card2: u32 = env
-            .storage()
-            .get(&CARD2)
-            .unwrap_or(Ok(12)) // If no value set, assume 1.
-            .unwrap(); // Panic if the value of CARD is not u32.
-
-        // Not exactly random, but looks random enough for this purpose.
-        let card1 = (2 * card1) % 13;
-        let card2 = (4 * card2) % 13;
-
-        // Save the count.
-        env.storage().set(&CARD1, &card1);
-        env.storage().set(&CARD2, &card2);
-        vec![&env, card1, card2]
+    pub fn draw_cards(env: Env) -> Vec<u32> {
+        let cards: Vec<u32> = if env.storage().has(&CARDS) {
+            let cards: Vec<u32> = env.storage().get_unchecked(&CARDS).unwrap();
+            let c0: u32 = cards.get(0).unwrap().unwrap();
+            let c1: u32 = cards.get(1).unwrap().unwrap();
+            let c2: u32 = cards.get(2).unwrap().unwrap();
+            // fake a random generator
+            vec![&env, (2 * c0) % 13, (4 * c1) % 13, (7 * c2) % 13]
+        } else {
+            vec![&env, 1, 7, 12]
+        };
+        // store the cards
+        env.storage().set(&CARDS, cards.clone());
+        // reset the decision
+        env.storage().set(&DECISION, 999); // an invalid decision
+        cards
     }
-    pub fn pub_prms() -> Bytes {
-        // prepprocessed circuits, public parameters, eval domains.
-        // This is the same as the pub_prms() in dealer.
-        // This isn't the cleanest design, but it might be good enough
-        // for this hackathon.
-        // (we can avoid circular dependencies)
-        let a:Bytes = "hardcoded bytes";
-        return a;
-    }
-    pub fn proof(env: Env) -> Bytes {
-        // This is where we call the host's generate_proof.
-        //
-        let _prm = Self::pub_prms();
-        let p:Bytes = "";
-        let choice: Symbol = env
-            .storage()
-            .get(&CHOICE)
-            .unwrap_or(Ok(NONE)) // If no value set, assume "NONE".
-            .unwrap(); // Panic if the value of CHOICE is not Symbol.
-        let card1: u32 = env
-            .storage()
-            .get(&CARD1)
-            .unwrap_or(Ok(1)) // If no value set, assume 1.
-            .unwrap(); // Panic if the value of CARD is not u32.
 
-        let card2: u32 = env
-            .storage()
-            .get(&CARD2)
-            .unwrap_or(Ok(12)) // If no value set, assume 1.
-            .unwrap(); // Panic if the value of CARD is not u32.
+    pub fn decide(env: Env, input: u32) -> Result<Symbol, Error> {
+        env.storage().set(&DECISION, input);
+        log!(&env, "Decision has been made -- {}", input);
+        log!(&env, "Generating proof..");
+        generate_proof(&env, input);
+        log!(&env, "{Proof generated.");
 
-
-        // TODO: We now have:
-        // - card1, card2: The cards that the user has
-        // - choice: the choice that the user made
-        // Using these as the input, we can generate a proof using
-        // _prm: public parameters.
-        return p;
-    }
-    pub fn hit(env: Env) {
-        let choice: Symbol = env
-            .storage()
-            .get(&CHOICE)
-            .unwrap_or(Ok(NONE)) // If no value set, assume "NONE".
-            .unwrap(); // Panic if the value of CHOICE is not Symbol.
-        if choice == NONE
-        {
-            env.storage().set(&CHOICE, &HIT);
-            let card1: u32 = env
-                .storage()
-                .get(&CARD1)
-                .unwrap_or(Ok(1)) // If no value set, assume 1.
-                .unwrap(); // Panic if the value of CARD is not u32.
-
-            let card2: u32 = env
-                .storage()
-                .get(&CARD2)
-                .unwrap_or(Ok(12)) // If no value set, assume 1.
-                .unwrap(); // Panic if the value of CARD is not u32.
-            if card1 + card2 > 21
-            {
-                log!(&env, "Your sum {} is > 21, but you decided to hit! Hope no one finds out!", card1 + card2);
-            }
-            else
-            {
-                log!(&env, "Your sum {} is <= 21, and you decided to hit! Good luck!", card1 + card2);
-            }
-        }
-        else
-        {
-            log!(&env, "you already chose to {}, you can't change your mind anymore", choice);
+        match input {
+            0 => Ok(STAND),
+            1 => Ok(HIT),
+            _ => Err(Error::InvalidDecision),
         }
     }
-    pub fn stand(env: Env) {
-        let choice: Symbol = env
-            .storage()
-            .get(&CHOICE)
-            .unwrap_or(Ok(NONE)) // If no value set, assume "NONE".
-            .unwrap(); // Panic if the value of CHOICE is not Symbol.
-        if choice == NONE
-        {
-            env.storage().set(&CHOICE, &STAND);
-            log!(&env, "You chose to stand (not take another card). Good luck!");
+
+    pub fn proof(env: Env) -> Result<Bytes, Error> {
+        if env.storage().has(&PROOF) {
+            Ok(env.storage().get_unchecked(&PROOF).unwrap())
+        } else {
+            Err(Error::NoProof)
         }
-        else
-        {
-            log!(&env, "you already chose to {}, you can't change your mind anymore", choice);
+    }
+
+    pub fn decision(env: Env) -> Result<u32, Error> {
+        if env.storage().has(&DECISION) {
+            Ok(env.storage().get_unchecked(&DECISION).unwrap())
+        } else {
+            Err(Error::NoDecision)
         }
     }
 }
+
+mod test;
